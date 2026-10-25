@@ -8,6 +8,8 @@ globalThis.fetch = (() => {
 const { run } = await import("./harness.js");
 await import("./primitives.test.js");
 await import("./kat.test.js");
+await import("./verify.test.js");
+await import("./adapter.test.js");
 const failed = await run();
 if (failed > 0) {
   // Deno and Node both expose process via node:process.
