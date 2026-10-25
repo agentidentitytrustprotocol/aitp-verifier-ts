@@ -73,8 +73,10 @@ jobs:
             const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
             if (!r.ok || r.result.implementation !== "aitp-verifier-ts" || r.result.commit !== process.env.GITHUB_SHA) process.exit(1);
           '
+      # The same relative tarball path the publish job uses.
       - name: Publish dry run
-        run: npm publish "$RUNNER_TEMP"/pack/*.tgz --dry-run --access public
+        working-directory: ${{ runner.temp }}
+        run: npm publish ./pack/*.tgz --dry-run --access public
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package
@@ -105,5 +107,6 @@ jobs:
         run: |
           v=$(npm --version); echo "npm $v"
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$v"
+      # `./`: a bare `pack/x.tgz` is read as GitHub `user/repo` shorthand.
       - name: Publish with provenance
-        run: npm publish pack/*.tgz --provenance --access public
+        run: npm publish ./pack/*.tgz --provenance --access public
