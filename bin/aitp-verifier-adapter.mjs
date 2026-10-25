@@ -49,7 +49,7 @@ for await (const line of rl) {
   try {
     request = JSON.parse(line);
   } catch (e) {
-    process.stdout.write(`${JSON.stringify({ id: null, ok: false, error_code: "INTERNAL_ERROR", message: `bad request: ${e.message}` })}\n`);
+    process.stdout.write(`${JSON.stringify({ id: null, ok: false, error_code: "MALFORMED_REQUEST", message: `bad request: ${e.message}` })}\n`);
     continue;
   }
   const reply = await adapter.handle(request);

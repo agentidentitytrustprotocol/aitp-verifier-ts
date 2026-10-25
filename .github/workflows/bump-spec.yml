@@ -1,0 +1,25 @@
+name: bump-spec
+# Adopt a new AITP spec revision. Dispatched by the spec repo's
+# notify-spec-consumers on a conformance-relevant push; also runnable
+# manually. The spec SHA lives in SPEC_VERSION, so bump-spec-ref runs in file
+# mode. The PR it opens is HELD, never auto-merged, and its CI fails until
+# vendor/spec and src/errors.ts are regenerated on the branch
+# (npm run sync:spec && npm run gen:errors): adopting a spec is a reviewed
+# change, not a bot's.
+on:
+  repository_dispatch:
+    types: [spec-released]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Spec SHA (blank = event payload / spec HEAD)'
+        required: false
+        default: ''
+jobs:
+  bump:
+    uses: agentidentitytrustprotocol/aitp-ci/.github/workflows/bump-spec-ref.yml@d9443b907a64a475794c204019b8f55d4751a68b # v1
+    with:
+      mode: file
+      file: SPEC_VERSION
+      sha: ${{ github.event.inputs.sha }}
+    secrets: inherit

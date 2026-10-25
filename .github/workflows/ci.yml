@@ -99,3 +99,141 @@ jobs:
       # Read access to the checkout only: no network, no env, no writes.
       - name: Known-answer and primitive tests under Deno
         run: deno run --no-prompt --allow-read=. build-test/test/run.js
+
+  # aitp-rs publishes neither the conformance runner nor its minter as a
+  # binary, so both are built once from the commit AITP_RS_COMMIT pins and
+  # handed to the two jobs below.
+  aitp-rs:
+    name: build aitp-rs tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: aitp-verifier-ts
+          persist-credentials: false
+      - name: Read the pinned aitp-rs commit
+        id: rs
+        run: echo "sha=$(tr -d '[:space:]' < aitp-verifier-ts/AITP_RS_COMMIT)" >> "$GITHUB_OUTPUT"
+      - name: Check out aitp-rs at the pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentidentitytrustprotocol/aitp-rs
+          path: aitp-rs
+          ref: ${{ steps.rs.outputs.sha }}
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          workspaces: aitp-rs
+      - name: Build aitp-conformance and xcheck-mint
+        working-directory: aitp-rs
+        run: |
+          cargo build --locked --release -p aitp-conformance --bin aitp-conformance
+          cargo build --locked --release -p mint-signed-examples --bin xcheck-mint
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aitp-rs-tools
+          path: |
+            aitp-rs/target/release/aitp-conformance
+            aitp-rs/target/release/xcheck-mint
+          if-no-files-found: error
+          retention-days: 1
+
+  # The adapter under aitp-rs's runner, against the pinned spec fixtures. The
+  # gate is the runner's own claim result, not a count kept here: every core
+  # fixture must pass with none skipped. The report must also satisfy the
+  # spec's schema and its report checker.
+  conformance:
+    name: conformance (aitp-conformance)
+    needs: aitp-rs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: aitp-verifier-ts
+          persist-credentials: false
+      - name: Read the pinned spec commit
+        id: spec
+        run: echo "sha=$(tr -d '[:space:]' < aitp-verifier-ts/SPEC_VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Check out the AITP spec at the pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentidentitytrustprotocol/agentidentitytrustprotocol
+          path: agentidentitytrustprotocol
+          ref: ${{ steps.spec.outputs.sha }}
+          fetch-depth: 0 # the report's spec.version is the newest tag at the pin
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aitp-rs-tools
+          path: tools
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Build the verifier
+        working-directory: aitp-verifier-ts
+        run: npm ci && npm run build
+      - name: Run the adapter under aitp-conformance
+        run: |
+          chmod +x tools/aitp-conformance
+          tools/aitp-conformance run \
+            --target aitp-verifier-ts/bin/aitp-verifier-adapter.mjs \
+            --fixtures-dir agentidentitytrustprotocol/schemas/conformance \
+            --report "$RUNNER_TEMP/conformance.json"
+      - name: Every gate passed, with no core fixture skipped
+        run: |
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            console.log("core:", JSON.stringify(r.totals.core));
+            const failed = r.gates.filter((g) => !g.passed).map((g) => g.name);
+            if (failed.length) { console.error("gates not passed:", failed.join(", ")); process.exit(1); }
+            if (r.totals.core.fail || r.totals.core.skip) { console.error("core fixtures failed or skipped"); process.exit(1); }
+          ' "$RUNNER_TEMP/conformance.json"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: The report validates against the schema and passes the spec's report checker
+        run: |
+          python -m pip install "jsonschema[format]>=4.23"
+          python - "$RUNNER_TEMP/conformance.json" <<'PY'
+          import json, sys
+          from jsonschema import Draft202012Validator
+          schema = json.load(open("agentidentitytrustprotocol/schemas/json/aitp-conformance-report.schema.json"))
+          report = json.load(open(sys.argv[1]))
+          errors = list(Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER).iter_errors(report))
+          for e in errors:
+              print(f"{e.json_path}: {e.message}")
+          sys.exit(1 if errors else 0)
+          PY
+          python agentidentitytrustprotocol/scripts/check-conformance-report.py "$RUNNER_TEMP/conformance.json" \
+            --fixtures-dir agentidentitytrustprotocol/schemas/conformance
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: conformance-report
+          path: ${{ runner.temp }}/conformance.json
+          if-no-files-found: ignore
+
+  # Fresh artifacts minted by aitp-rs this run, verified here byte for byte,
+  # negatives included. Nothing is re-signed on this side.
+  mint-verify:
+    name: mint (aitp-rs) -> verify
+    needs: aitp-rs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aitp-rs-tools
+          path: ${{ runner.temp }}/tools
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci && npm run build
+      - name: Mint with aitp-rs and verify
+        run: |
+          chmod +x "$RUNNER_TEMP/tools/xcheck-mint"
+          "$RUNNER_TEMP/tools/xcheck-mint" > "$RUNNER_TEMP/minted.json"
+          node scripts/xcheck-verify.mjs < "$RUNNER_TEMP/minted.json"

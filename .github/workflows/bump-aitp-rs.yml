@@ -1,0 +1,66 @@
+name: bump-aitp-rs
+# Move AITP_RS_COMMIT, the aitp-rs commit whose conformance runner and minter
+# ci.yml builds, to a new aitp-rs release. aitp-rs dispatches `aitp-released`
+# to the repos it lists; until this repo is on that list, the daily schedule
+# picks a release up within a day. The pin is a plain SHA file, so the PR is
+# opened by the same reusable bump-spec-ref (file mode) the spec pin uses,
+# pointed at aitp-rs, and like a spec bump it is HELD for review: a new runner
+# can change which fixtures pass.
+on:
+  repository_dispatch:
+    types: [aitp-released]
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'aitp-rs release (e.g. 0.24.0; blank = event payload / latest)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.v.outputs.sha }}
+      newer: ${{ steps.v.outputs.newer }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve the release commit
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RS: agentidentitytrustprotocol/aitp-rs
+          EVENT: ${{ github.event.client_payload.version }}
+          MANUAL: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          V="${EVENT:-$MANUAL}"
+          if [ -z "$V" ]; then
+            TAG=$(gh api "repos/$RS/releases?per_page=50" --jq '[.[] | select(.tag_name | test("^aitp-v[0-9]")) | select(.prerelease | not)][0].tag_name')
+          else
+            TAG="aitp-v${V#v}"
+          fi
+          SHA=$(gh api "repos/$RS/commits/$TAG" --jq .sha)
+          CUR=$(tr -d '[:space:]' < AITP_RS_COMMIT)
+          # Only move forward: a release at or behind the pin (the pin may be
+          # a main commit past the last release) is not a bump.
+          STATUS=$(gh api "repos/$RS/compare/$CUR...$SHA" --jq .status)
+          echo "$TAG = $SHA; pin $CUR; release is $STATUS of the pin"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" = "ahead" ]; then echo "newer=true" >> "$GITHUB_OUTPUT"; else echo "newer=false" >> "$GITHUB_OUTPUT"; fi
+  bump:
+    needs: resolve
+    if: ${{ needs.resolve.outputs.newer == 'true' }}
+    uses: agentidentitytrustprotocol/aitp-ci/.github/workflows/bump-spec-ref.yml@d9443b907a64a475794c204019b8f55d4751a68b # v1
+    with:
+      mode: file
+      file: AITP_RS_COMMIT
+      spec-repo: agentidentitytrustprotocol/aitp-rs
+      sha: ${{ needs.resolve.outputs.sha }}
+    secrets: inherit

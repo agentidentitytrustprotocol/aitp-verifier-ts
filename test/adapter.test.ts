@@ -27,6 +27,7 @@ test("adapter: init advertises every op it dispatches", async () => {
   // A v0.3 delegation input names delegation_token; the v0.1 object shape is a skip.
   for (const op of ops) assert(errorCode(await call(a, op, { delegation_token: "x" })) !== "OP_NOT_SUPPORTED", `${op} is dispatched`);
   eq(errorCode(await call(a, "verify_delegation_token", { delegation: {} })), "OP_NOT_SUPPORTED");
+  eq(errorCode(await call(a, "verify_delegation_token", { delegation: { chain: [] } })), "DELEGATION_MULTIHOP_NOT_SUPPORTED");
 });
 
 test("adapter: an unknown op is a skip, not a failure", async () => {
@@ -45,6 +46,13 @@ test("adapter: replay state lasts for one fixture", async () => {
   eq(errorCode(await call(a, "process_handshake_message", id)), "REPLAY_DETECTED");
   await call(a, "begin_fixture");
   eq(errorCode(await call(a, "process_handshake_message", id)), undefined, "reset by begin_fixture");
+});
+
+test("adapter: a receive op without self_aid is a malformed request, never a skip", async () => {
+  const a = adapter();
+  const envelope = { message_type: "mutual_hello" };
+  eq(errorCode(await call(a, "verify_handshake_payload", { envelope })), "MALFORMED_REQUEST");
+  eq(errorCode(await call(a, "verify_handshake_payload", { peer_a: {} })), "MALFORMED_REQUEST");
 });
 
 test("adapter: protocol errors carry the registry code; adapter faults do not", async () => {
