@@ -13,11 +13,11 @@ An independent TypeScript verifier for the
   commit are vendored under `vendor/spec/`. CI checks both against a spec
   checkout at the pin. `src/errors.ts` is generated from the registry.
 
-> Status: TS4.2 of the
+> Status: TS4.3 of the
 > [adoption plan](https://github.com/agentidentitytrustprotocol/agentidentitytrustprotocol/blob/main/plans/cross-repo/aitp-ts-verifier-adoption-90-day.md).
-> The artifact verifiers are in place, and the conformance adapter passes the
-> `aitp-conformance` "AITP v0.3" core claim at the pinned spec commit.
-> Not yet published to npm.
+> Under `aitp-conformance` the adapter passes the "AITP v0.3" core claim at
+> the pinned spec commit with no core fixture skipped. Artifacts that aitp-rs
+> mints verify here. Not yet published to npm.
 
 ## Runtimes
 
@@ -76,7 +76,43 @@ aitp-conformance run --target ../aitp-verifier-ts/bin/aitp-verifier-adapter.mjs
 | `authorize_capability_invocation`, `expect_pop_challenge_issued`, `withhold_pop_response` | issuer-side PoP enforcement over `verifyTct` |
 | `verify_revocation_snapshot` | `verifySnapshot` and `decideRevocation` |
 | `verify_grant_voucher` | `verifyVoucher` |
-| `verify_delegation_token` | `verifyDelegation` (the frozen v0.1 object shape, del-004, is a skip) |
+| `verify_delegation_token` | `verifyDelegation`; the frozen v0.1 object is refused at its `chain` (del-004) and otherwise not verified |
+
+Receive-side handshake ops need the fixture's `self_aid`. Without it the
+reply is `MALFORMED_REQUEST`, as it is for a line that is not JSON. The
+audience checks are never skipped.
+
+## CI
+
+All of these run against the spec commit in `SPEC_VERSION`. Runner and
+minter come from the aitp-rs commit in `AITP_RS_COMMIT`. aitp-rs publishes
+neither as a binary, so CI builds them.
+
+| Check | What it proves |
+|---|---|
+| `spec pin + generated files` | `vendor/spec` and `src/errors.ts` match the spec at the pin; strict types; no runtime dependencies |
+| `tests (node 20)`, `tests (node 22)`, `tests (deno)` | the known-answer, primitive, verifier and adapter suites |
+| `conformance (aitp-conformance)` | the adapter passes every gate with zero core skips; the report validates against `aitp-conformance-report.schema.json` and `check-conformance-report.py`, and is uploaded |
+| `mint (aitp-rs) -> verify` | artifacts aitp-rs mints in that run verify here byte for byte, and the negatives (high-S, untagged, double-hashed, withheld or confused keys) fail |
+
+Pin maintenance:
+
+- `bump-spec.yml` handles a new spec. It runs on the spec repo's
+  `spec-released` dispatch and opens a held PR that moves `SPEC_VERSION`. On
+  that branch, run `npm run sync:spec && npm run gen:errors` before merging.
+- `bump-aitp-rs.yml` handles a new aitp-rs. It runs on an `aitp-released`
+  dispatch and daily, and opens a held PR that moves `AITP_RS_COMMIT` to the
+  newest `aitp-v*` release ahead of the pin.
+- `spec-canary.yml` (daily, not required) runs the suite and conformance
+  against spec `main`. It keeps one tracking issue open while that fails.
+- `auto-merge.yml` arms auto-merge on patch and minor Dependabot PRs.
+
+To run the mint check locally from an aitp-rs checkout next to this one:
+
+```sh
+npm run build
+(cd ../aitp-rs && cargo run --quiet -p mint-signed-examples --bin xcheck-mint) | node scripts/xcheck-verify.mjs
+```
 
 ## Primitives
 

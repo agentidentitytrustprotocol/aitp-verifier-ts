@@ -1,0 +1,111 @@
+name: spec canary
+
+# Conformance against the spec's floating `main`, not the SPEC_VERSION pin
+# that ci.yml's required checks use. It is not a required check: a spec merge
+# that breaks this repo shows up here, and in one tracking issue, without
+# blocking any PR. The fix is a SPEC_VERSION bump, which bump-spec.yml opens.
+on:
+  schedule:
+    # 06:47 UTC daily, after verifier-py's canary; :47 dodges top-of-hour queueing.
+    - cron: "47 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: "Spec canary: conformance fails against spec main"
+
+jobs:
+  canary:
+    name: conformance against spec main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: aitp-verifier-ts
+          persist-credentials: false
+      - name: Check out the AITP spec at main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentidentitytrustprotocol/agentidentitytrustprotocol
+          path: agentidentitytrustprotocol
+          fetch-depth: 0
+          persist-credentials: false
+      - id: spec
+        run: echo "sha=$(git -C agentidentitytrustprotocol rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Read the pinned aitp-rs commit
+        id: rs
+        run: echo "sha=$(tr -d '[:space:]' < aitp-verifier-ts/AITP_RS_COMMIT)" >> "$GITHUB_OUTPUT"
+      - name: Check out aitp-rs at the pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentidentitytrustprotocol/aitp-rs
+          path: aitp-rs
+          ref: ${{ steps.rs.outputs.sha }}
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          workspaces: aitp-rs
+      - name: Build aitp-conformance
+        working-directory: aitp-rs
+        run: cargo build --locked --release -p aitp-conformance --bin aitp-conformance
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # What a bump PR would contain: the pin moved, the vendored files and
+      # errors.ts regenerated from spec main.
+      - name: Adopt spec main in the working tree
+        working-directory: aitp-verifier-ts
+        env:
+          SHA: ${{ steps.spec.outputs.sha }}
+        run: |
+          echo "$SHA" > SPEC_VERSION
+          node scripts/sync-spec.mjs --spec-dir ../agentidentitytrustprotocol
+          node scripts/gen-errors.mjs
+          git status --short
+      - name: Tests
+        working-directory: aitp-verifier-ts
+        run: npm ci && npm test && npm run build
+      - name: Conformance
+        run: |
+          aitp-rs/target/release/aitp-conformance run \
+            --target aitp-verifier-ts/bin/aitp-verifier-adapter.mjs \
+            --fixtures-dir agentidentitytrustprotocol/schemas/conformance \
+            --report "$RUNNER_TEMP/conformance.json"
+
+      # One tracking issue, updated in place: a comment per failing run, never
+      # a new issue per run. A green run closes it.
+      - name: Report failure on the tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SPEC_SHA: ${{ steps.spec.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="Spec main \`${SPEC_SHA}\` fails here: ${RUN_URL}. Pinned spec: \`$(git -C aitp-verifier-ts show HEAD:SPEC_VERSION)\`."
+          num=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number,title \
+                --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body "$body"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body "$body"
+          fi
+      - name: Close the tracking issue on recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SPEC_SHA: ${{ steps.spec.outputs.sha }}
+        run: |
+          num=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number,title \
+                --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$num" ]; then
+            gh issue close "$num" --comment "Spec main \`${SPEC_SHA}\` passes again."
+          fi
