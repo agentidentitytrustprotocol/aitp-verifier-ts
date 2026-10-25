@@ -2,10 +2,18 @@
 
 **Who:** an owner of the `agentidentitytrustprotocol` npm organization. No session can
 do this, because it needs that account's logged-in session and 2FA.
-**Why:** [`release.yml`](../../.github/workflows/release.yml) publishes with OIDC trusted
-publishing, so no npm token exists to leak or rotate. Every release carries a provenance
-attestation that ties it to the workflow run that built it. npm accepts the upload only
-once a trusted publisher matching the workflow is configured on the package.
+**Why:** [`release.yml`](../../.github/workflows/release.yml) is meant to publish with OIDC
+trusted publishing, so that no npm token exists to leak or rotate. Every release carries a
+provenance attestation that ties it to the workflow run that built it.
+
+> **Current state: token upload, OIDC provenance.** npm's OIDC token exchange rejects
+> GitHub's immutable `sub` claim, which GitHub forces on repositories created after
+> 2026-07-15, including this one. It answers `404 "OIDC token exchange error - package not
+> found"`; see [npm/cli#9969](https://github.com/npm/cli/issues/9969). Until npm fixes it,
+> the publish step authenticates with the org `NPM_TOKEN` and still signs provenance with
+> the job's OIDC token. Publishing access must therefore be "Require two-factor
+> authentication" (step 2), not "…and disallow tokens". Switching back is tracked in
+> aitp-verifier-ts#12.
 
 The GitHub side is already in place. The `npm` environment exists on the repository and
 deploys only from `v*` tags. Every pull request packs the tarball, installs it into an
@@ -40,7 +48,9 @@ Actions:
 | Environment name | `npm` |
 
 Then, on the same page under Publishing access, choose "Require two-factor
-authentication and disallow tokens". With that set, only the workflow can publish.
+authentication". While npm/cli#9969 is open, the token upload needs that setting, which
+still requires 2FA for people publishing by hand. Once #12 lands, switch to "Require
+two-factor authentication and disallow tokens", so that only the workflow can publish.
 
 ## 3. Release
 
