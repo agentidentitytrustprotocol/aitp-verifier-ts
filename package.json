@@ -10,7 +10,15 @@
   },
   "homepage": "https://github.com/agentidentitytrustprotocol/aitp-verifier-ts#readme",
   "bugs": "https://github.com/agentidentitytrustprotocol/aitp-verifier-ts/issues",
-  "keywords": ["aitp", "agent-identity", "verifier", "conformance", "jws", "jcs", "webcrypto"],
+  "keywords": [
+    "aitp",
+    "agent-identity",
+    "verifier",
+    "conformance",
+    "jws",
+    "jcs",
+    "webcrypto"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -20,12 +28,26 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "SPEC_VERSION", "README.md", "LICENSE"],
+  "bin": {
+    "aitp-verifier-adapter": "bin/aitp-verifier-adapter.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "vendor/spec/schemas/conformance/known-answer/oidc-test-issuers.json",
+    "SPEC_VERSION",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/stamp-build.mjs",
     "build:test": "tsc -p tsconfig.test.json",
     "test": "npm run build:test && node build-test/test/run.js",
     "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",

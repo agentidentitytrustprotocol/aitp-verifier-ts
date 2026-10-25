@@ -13,11 +13,24 @@ An independent TypeScript verifier for the
   commit are vendored under `vendor/spec/`. CI checks both against a spec
   checkout at the pin. `src/errors.ts` is generated from the registry.
 
-> Status: TS4.3 of the
+> Status: TS4.4 of the
 > [adoption plan](https://github.com/agentidentitytrustprotocol/agentidentitytrustprotocol/blob/main/plans/cross-repo/aitp-ts-verifier-adoption-90-day.md).
 > Under `aitp-conformance` the adapter passes the "AITP v0.3" core claim at
 > the pinned spec commit with no core fixture skipped. Artifacts that aitp-rs
-> mints verify here. Not yet published to npm.
+> mints verify here. Releases publish to npm from CI with provenance.
+
+## Install
+
+```sh
+npm i @agentidentitytrustprotocol/verifier
+```
+
+```js
+import { parseJson, systemNow, verifyEnvelope } from "@agentidentitytrustprotocol/verifier";
+
+// parseJson rejects duplicate keys, which JSON.parse silently accepts.
+const envelope = await verifyEnvelope(parseJson(message), { now: systemNow() });
+```
 
 ## Runtimes
 
@@ -55,14 +68,18 @@ code, and each verifier runs its checks in the order its RFC fixes.
 
 `bin/aitp-verifier-adapter.mjs` speaks the `aitp-conformance` NDJSON adapter
 protocol over stdin and stdout. It maps fixture inputs onto the verifiers
-above. It lives in the repository only and is not published to npm, because
-it reads the OIDC test-issuer keys from `vendor/spec/`.
+above. The package ships it as the `aitp-verifier-adapter` bin, along with the
+spec's OIDC test-issuer keys it trusts. Its `init` reply reports the commit
+stamped at build time.
 
 ```sh
-npm run build
-cd ../agentidentitytrustprotocol
-aitp-conformance run --target ../aitp-verifier-ts/bin/aitp-verifier-adapter.mjs
+npm i @agentidentitytrustprotocol/verifier
+aitp-conformance run --target node_modules/.bin/aitp-verifier-adapter \
+  --fixtures-dir ../agentidentitytrustprotocol/schemas/conformance
 ```
+
+From a checkout, run `npm run build` and use `bin/aitp-verifier-adapter.mjs`
+as the target.
 
 | Op | Verifier |
 |---|---|
@@ -106,6 +123,13 @@ Pin maintenance:
 - `spec-canary.yml` (daily, not required) runs the suite and conformance
   against spec `main`. It keeps one tracking issue open while that fails.
 - `auto-merge.yml` arms auto-merge on patch and minor Dependabot PRs.
+
+Releases: `release.yml` runs on every PR and push. It packs the tarball,
+installs it into an empty project, imports the library, runs the adapter
+through `npx`, and does an `npm publish --dry-run`. A `v*` tag that matches
+`package.json` then publishes that tarball through npm trusted publishing
+(OIDC, with provenance, and no token). The one-time npmjs.com setup is in
+[`scripts/handoff/npm-trusted-publisher.md`](scripts/handoff/npm-trusted-publisher.md).
 
 To run the mint check locally from an aitp-rs checkout next to this one:
 
