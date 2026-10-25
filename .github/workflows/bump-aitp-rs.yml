@@ -2,7 +2,8 @@ name: bump-aitp-rs
 # Move AITP_RS_COMMIT, the aitp-rs commit whose conformance runner and minter
 # ci.yml builds, to a new aitp-rs release. aitp-rs dispatches `aitp-released`
 # to the repos it lists; until this repo is on that list, the daily schedule
-# picks a release up within a day. The pin is a plain SHA file, so the PR is
+# picks a release up within a day (the fallback once aitp-rs lists this
+# repo). The pin is a plain SHA file, so the PR is
 # opened by the same reusable bump-spec-ref (file mode) the spec pin uses,
 # pointed at aitp-rs, and like a spec bump it is HELD for review: a new runner
 # can change which fixtures pass.
@@ -57,10 +58,11 @@ jobs:
   bump:
     needs: resolve
     if: ${{ needs.resolve.outputs.newer == 'true' }}
-    uses: agentidentitytrustprotocol/aitp-ci/.github/workflows/bump-spec-ref.yml@d9443b907a64a475794c204019b8f55d4751a68b # v1
+    uses: agentidentitytrustprotocol/aitp-ci/.github/workflows/bump-spec-ref.yml@fe53310ca469e5b7d53cee52f6a7b7d5f4e5521d # v1
     with:
       mode: file
       file: AITP_RS_COMMIT
       spec-repo: agentidentitytrustprotocol/aitp-rs
       sha: ${{ needs.resolve.outputs.sha }}
+      label: aitp-rs
     secrets: inherit

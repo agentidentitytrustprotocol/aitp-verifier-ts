@@ -98,8 +98,8 @@ neither as a binary, so CI builds them.
 Pin maintenance:
 
 - `bump-spec.yml` handles a new spec. It runs on the spec repo's
-  `spec-released` dispatch and opens a held PR that moves `SPEC_VERSION`. On
-  that branch, run `npm run sync:spec && npm run gen:errors` before merging.
+  `spec-released` dispatch and opens a held PR that moves `SPEC_VERSION`.
+  The PR regenerates `vendor/spec` and `src/errors.ts` at the new pin.
 - `bump-aitp-rs.yml` handles a new aitp-rs. It runs on an `aitp-released`
   dispatch and daily, and opens a held PR that moves `AITP_RS_COMMIT` to the
   newest `aitp-v*` release ahead of the pin.
