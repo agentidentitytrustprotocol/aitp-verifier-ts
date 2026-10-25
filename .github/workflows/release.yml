@@ -1,9 +1,11 @@
 name: Release
 
-# Publishes @agentidentitytrustprotocol/verifier to npm with OIDC trusted
-# publishing and provenance: no npm token is used. The npmjs.com side (the
-# trusted publisher for this repo and workflow) is a one-time owner action;
-# see scripts/handoff/npm-trusted-publisher.md.
+# Publishes @agentidentitytrustprotocol/verifier to npm with provenance.
+# Provenance is signed with this job's GitHub OIDC token. The upload itself
+# authenticates with the org NPM_TOKEN for now, because npm's OIDC exchange
+# rejects this repo's immutable `sub` claim: npm/cli#9969
+# (https://github.com/npm/cli/issues/9969). Switching back to trusted
+# publishing is tracked in #12. See scripts/handoff/npm-trusted-publisher.md.
 #
 # * pull_request, push to main -> pack, smoke-test the tarball, publish --dry-run.
 # * tag `v*` pushed            -> the same, then publish that exact tarball
@@ -93,7 +95,7 @@ jobs:
       url: https://www.npmjs.com/package/@agentidentitytrustprotocol/verifier
     permissions:
       contents: read
-      id-token: write # trusted publishing and provenance (OIDC)
+      id-token: write # provenance (OIDC); trusted publishing once npm/cli#9969 is fixed
     steps:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -103,10 +105,14 @@ jobs:
         with:
           name: package
           path: pack
-      - name: npm is new enough for trusted publishing
+      - name: npm is new enough for provenance and trusted publishing
         run: |
           v=$(npm --version); echo "npm $v"
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$v"
       # `./`: a bare `pack/x.tgz` is read as GitHub `user/repo` shorthand.
+      # NODE_AUTH_TOKEN is the npm/cli#9969 workaround and lives on this step
+      # only; drop it when #12 switches back to OIDC trusted publishing.
       - name: Publish with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish ./pack/*.tgz --provenance --access public

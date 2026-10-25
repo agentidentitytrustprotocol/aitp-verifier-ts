@@ -127,8 +127,13 @@ Pin maintenance:
 Releases: `release.yml` runs on every PR and push. It packs the tarball,
 installs it into an empty project, imports the library, runs the adapter
 through `npx`, and does an `npm publish --dry-run`. A `v*` tag that matches
-`package.json` then publishes that tarball through npm trusted publishing
-(OIDC, with provenance, and no token). The one-time npmjs.com setup is in
+`package.json` then publishes that tarball with provenance, signed with the
+job's GitHub OIDC token. The upload authenticates with the org `NPM_TOKEN`,
+used on that one step only, until npm fixes
+[npm/cli#9969](https://github.com/npm/cli/issues/9969): npm's OIDC exchange
+rejects this repo's immutable `sub` claim. Moving back to tokenless trusted
+publishing is tracked in
+[#12](https://github.com/agentidentitytrustprotocol/aitp-verifier-ts/issues/12). The npmjs.com setup is in
 [`scripts/handoff/npm-trusted-publisher.md`](scripts/handoff/npm-trusted-publisher.md).
 
 To run the mint check locally from an aitp-rs checkout next to this one:
