@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Every job runs against the spec commit pinned in SPEC_VERSION, so a spec
+# merge cannot turn this repo's required checks red without a PR here.
+#
+# Job and matrix names are the strings main's branch protection requires.
+# Renaming one (or adding a matrix dimension, which GitHub appends to the
+# name) leaves every PR waiting on a check that never reports.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  spec:
+    name: spec pin + generated files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: aitp-verifier-ts
+          persist-credentials: false
+      - name: Read the pinned spec commit
+        id: spec
+        shell: bash
+        run: echo "sha=$(tr -d '[:space:]' < aitp-verifier-ts/SPEC_VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Check out the AITP spec at the pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentidentitytrustprotocol/agentidentitytrustprotocol
+          path: agentidentitytrustprotocol
+          ref: ${{ steps.spec.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: vendor/spec matches the spec at the pin
+        working-directory: aitp-verifier-ts
+        run: node scripts/sync-spec.mjs --spec-dir ../agentidentitytrustprotocol --check
+      - name: src/errors.ts matches the error-code registry
+        working-directory: aitp-verifier-ts
+        run: node scripts/gen-errors.mjs --check
+      - name: Install
+        working-directory: aitp-verifier-ts
+        run: npm ci
+      - name: Types (strict, src and tests)
+        working-directory: aitp-verifier-ts
+        run: npm run typecheck
+      - name: No runtime dependencies
+        working-directory: aitp-verifier-ts
+        run: node -e 'const p=require("./package.json"); for (const k of ["dependencies","peerDependencies","optionalDependencies"]) if (p[k] && Object.keys(p[k]).length) { console.error(k + " must be empty"); process.exit(1) }'
+
+  node:
+    name: tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - name: Known-answer and primitive tests
+        run: npm test
+      - name: Package builds
+        run: npm run build && npm pack --dry-run
+
+  deno:
+    name: tests (deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.8
+      - run: npm ci
+      - name: Compile the suite
+        run: npm run build:test
+      # Read access to the checkout only: no network, no env, no writes.
+      - name: Known-answer and primitive tests under Deno
+        run: deno run --no-prompt --allow-read=. build-test/test/run.js

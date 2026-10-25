@@ -1,0 +1,29 @@
+{
+  "_kat_input": {
+    "issuer_seed_id": "kat-keypair-001",
+    "published_at": 1711900000,
+    "ttl_secs": 3600,
+    "entries": [
+      {
+        "jti": "550e8400-e29b-41d4-a716-446655440099",
+        "revoked_at": 1711900060,
+        "reason": "key_compromised"
+      }
+    ]
+  },
+  "signing_input": "body",
+  "revocation_list": {
+    "version": "aitp/0.3",
+    "issuer": "aid:pubkey:O2onvM62pC1io6jQKm8Nc2UyFXcd4kOmOsBIoYtZ2ik",
+    "published_at": 1711900000,
+    "expires_at": 1711903600,
+    "entries": [
+      {
+        "jti": "550e8400-e29b-41d4-a716-446655440099",
+        "revoked_at": 1711900060,
+        "reason": "key_compromised"
+      }
+    ]
+  },
+  "signature": "wWcNpzrG_gT0B21GXeMFXDq9nU4dvGPXmUsoVE1Z7W7ttcaQ0nOf5WDbQWAeGx6FM_sZ0J1wlHoIXtHUR9IACQ"
+}
