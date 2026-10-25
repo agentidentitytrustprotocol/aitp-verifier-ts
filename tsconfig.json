@@ -1,0 +1,7 @@
+{
+  "//": "Editor and typecheck entry point: sources and tests together. Builds use tsconfig.build.json; the test build uses tsconfig.test.json.",
+  "extends": "./tsconfig.test.json",
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

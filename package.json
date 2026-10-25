@@ -1,0 +1,42 @@
+{
+  "name": "@agentidentitytrustprotocol/verifier",
+  "version": "0.1.0",
+  "description": "Independent TypeScript verifier for the Agent Identity & Trust Protocol (AITP), written from the RFCs. WebCrypto only, zero runtime dependencies.",
+  "license": "Apache-2.0",
+  "author": "AITP contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentidentitytrustprotocol/aitp-verifier-ts.git"
+  },
+  "homepage": "https://github.com/agentidentitytrustprotocol/aitp-verifier-ts#readme",
+  "bugs": "https://github.com/agentidentitytrustprotocol/aitp-verifier-ts/issues",
+  "keywords": ["aitp", "agent-identity", "verifier", "conformance", "jws", "jcs", "webcrypto"],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "SPEC_VERSION", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build:test && node build-test/test/run.js",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "gen:errors": "node scripts/gen-errors.mjs",
+    "check:errors": "node scripts/gen-errors.mjs --check",
+    "sync:spec": "node scripts/sync-spec.mjs --spec-dir ../agentidentitytrustprotocol",
+    "check:spec": "node scripts/sync-spec.mjs --spec-dir ../agentidentitytrustprotocol --check",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  }
+}
