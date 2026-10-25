@@ -9,7 +9,9 @@ name: Release
 #
 # * pull_request, push to main -> pack, smoke-test the tarball, publish --dry-run.
 # * tag `v*` pushed            -> the same, then publish that exact tarball
-#                                 (environment `npm`).
+#                                 (environment `npm`) unless the version is
+#                                 already on the registry, and verify what
+#                                 the registry serves (#11).
 #
 # Every action is pinned by commit SHA: this workflow holds publish rights.
 
@@ -97,6 +99,11 @@ jobs:
       contents: read
       id-token: write # provenance (OIDC); trusted publishing once npm/cli#9969 is fixed
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/verify-published.mjs
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -109,10 +116,39 @@ jobs:
         run: |
           v=$(npm --version); echo "npm $v"
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$v"
+      # A re-run of a published tag never publishes again: it only verifies.
+      - name: Already on the registry?
+        id: registry
+        run: |
+          set +e
+          node scripts/verify-published.mjs pack/*.tgz --exists
+          rc=$?
+          set -e
+          case $rc in
+            0) echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            3) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$rc" ;;
+          esac
       # `./`: a bare `pack/x.tgz` is read as GitHub `user/repo` shorthand.
       # NODE_AUTH_TOKEN is the npm/cli#9969 workaround and lives on this step
       # only; drop it when #12 switches back to OIDC trusted publishing.
+      # npm can refuse with E409 for a version it accepted moments ago but
+      # does not serve yet (#11); that is left to the verify step to settle.
       - name: Publish with provenance
+        if: steps.registry.outputs.published == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish ./pack/*.tgz --provenance --access public
+        run: |
+          set +e
+          npm publish ./pack/*.tgz --provenance --access public 2>&1 | tee "$RUNNER_TEMP/publish.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            grep -Eq 'E409|previously (published|staged)' "$RUNNER_TEMP/publish.log" || exit "$rc"
+            echo "::notice::npm reports this version as already submitted; verifying it on the registry"
+          fi
+      # The job's real result: what the registry serves, with bounded backoff
+      # for npm's processing lag. The same tarball (integrity, or contents if
+      # a re-run compressed it differently), its provenance, and latest.
+      - name: Verify on the registry
+        run: node scripts/verify-published.mjs pack/*.tgz --budget-secs 600

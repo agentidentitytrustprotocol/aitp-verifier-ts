@@ -131,7 +131,12 @@ through `npx`, and does an `npm publish --dry-run`. A `v*` tag that matches
 job's GitHub OIDC token. The upload authenticates with the org `NPM_TOKEN`,
 used on that one step only, until npm fixes
 [npm/cli#9969](https://github.com/npm/cli/issues/9969): npm's OIDC exchange
-rejects this repo's immutable `sub` claim. Moving back to tokenless trusted
+rejects this repo's immutable `sub` claim. The job then checks the registry
+itself ([`scripts/verify-published.mjs`](scripts/verify-published.mjs)),
+retrying for up to 10 minutes while npm catches up. It checks that the
+version is served with this tarball's integrity, that its provenance
+attestation names this tarball, and that `latest` points at it. Re-running a
+tag that is already published skips `npm publish` and runs only that check. Moving back to tokenless trusted
 publishing is tracked in
 [#12](https://github.com/agentidentitytrustprotocol/aitp-verifier-ts/issues/12). The npmjs.com setup is in
 [`scripts/handoff/npm-trusted-publisher.md`](scripts/handoff/npm-trusted-publisher.md).
