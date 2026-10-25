@@ -13,10 +13,11 @@ An independent TypeScript verifier for the
   commit are vendored under `vendor/spec/`. CI checks both against a spec
   checkout at the pin. `src/errors.ts` is generated from the registry.
 
-> Status: TS4.1 of the
+> Status: TS4.2 of the
 > [adoption plan](https://github.com/agentidentitytrustprotocol/agentidentitytrustprotocol/blob/main/plans/cross-repo/aitp-ts-verifier-adoption-90-day.md).
-> The primitives and every known-answer vector are in place. The artifact
-> verifiers and the conformance adapter come in TS4.2. Not yet published to npm.
+> The artifact verifiers are in place, and the conformance adapter passes the
+> `aitp-conformance` "AITP v0.3" core claim at the pinned spec commit.
+> Not yet published to npm.
 
 ## Runtimes
 
@@ -31,7 +32,53 @@ Ed25519 needs WebCrypto Ed25519 support. Where a runtime lacks it,
 `ed25519Available()` returns false. Verification then fails closed with
 `AlgorithmUnavailableError`: it never passes.
 
-## What is here (TS4.1)
+## Verifiers
+
+Every verifier takes `now` (Unix seconds) and its trust inputs as
+arguments. Each failure throws an `AitpError` whose `code` is a registry
+code, and each verifier runs its checks in the order its RFC fixes.
+
+| Function | Verifies | Spec |
+|---|---|---|
+| `verifyEnvelope` | Envelope replay, timestamp window, version, structure, member set, then signature. | RFC-AITP-0001 §5; RFC-AITP-0009 §3.1 |
+| `verifyManifest` | Manifest version, structure, member set, expiry, proof of possession, then signature. | RFC-AITP-0003 §5 |
+| `verifyIdentity` | OIDC and pinned-key identity bindings, with the trust-anchor check before any key resolution. | RFC-AITP-0002; RFC-AITP-0004 §5.1 step 6 |
+| `verifyMutualHello`, `verifyMutualHelloAck` | Round 1 of the handshake: the trust bootstrap from the inline Manifest, identity, then policy. | RFC-AITP-0004 §5.1, §5.2 |
+| `verifyMutualCommit`, `verifyCommitPayload` | Round 2: nonce echo, PoP signature, the TCT, then grant bounds. | RFC-AITP-0004 §5.3, §5.4 |
+| `verifyTct` | Holder-side TCT verification, with revocation behind a callback that is only reached last. | RFC-AITP-0005 §7.2 |
+| `verifyTctAsIssuer` | A TCT presented back to its issuer, with downstream proof of possession. | RFC-AITP-0005 §10.5 |
+| `verifyPopChallenge`, `verifyPopResponse` | Downstream proof of possession. | RFC-AITP-0005 §6 |
+| `verifySnapshot`, `snapshotStatus`, `decideRevocation` | Signed revocation snapshots, and the revocation mode (default `fail_closed`). | RFC-AITP-0008 |
+| `verifyVoucher`, `verifyDelegation` | Grant vouchers and single-hop delegation tokens. | RFC-AITP-0005 §8; RFC-AITP-0006 §4 |
+
+## Conformance adapter
+
+`bin/aitp-verifier-adapter.mjs` speaks the `aitp-conformance` NDJSON adapter
+protocol over stdin and stdout. It maps fixture inputs onto the verifiers
+above. It lives in the repository only and is not published to npm, because
+it reads the OIDC test-issuer keys from `vendor/spec/`.
+
+```sh
+npm run build
+cd ../agentidentitytrustprotocol
+aitp-conformance run --target ../aitp-verifier-ts/bin/aitp-verifier-adapter.mjs
+```
+
+| Op | Verifier |
+|---|---|
+| `verify_envelope` | `verifyEnvelope`, or the replay, policy or key-resolution case the fixture describes |
+| `verify_manifest` | `verifyManifest` |
+| `verify_handshake_payload` | `verifyMutualHello`, `verifyMutualHelloAck`, `verifyMutualCommit`, `verifyCommitPayload` |
+| `process_handshake_message` | message-id replay |
+| `verify_tct` | `verifyTct` with the fixture's revocation list |
+| `verify_tct_as_issuer` | `verifyTctAsIssuer` with `verifyPopResponse` |
+| `issue_pop_challenge`, `produce_pop_response`, `verify_pop_response` | `verifyPopChallenge`, `verifyPopResponse` |
+| `authorize_capability_invocation`, `expect_pop_challenge_issued`, `withhold_pop_response` | issuer-side PoP enforcement over `verifyTct` |
+| `verify_revocation_snapshot` | `verifySnapshot` and `decideRevocation` |
+| `verify_grant_voucher` | `verifyVoucher` |
+| `verify_delegation_token` | `verifyDelegation` (the frozen v0.1 object shape, del-004, is a skip) |
+
+## Primitives
 
 | Module | What it does | Spec |
 |---|---|---|
