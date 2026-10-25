@@ -57,7 +57,10 @@ two-factor authentication and disallow tokens", so that only the workflow can pu
 1. Make sure `version` in `package.json` is the version to publish, for example `0.1.0`.
 2. `git tag v0.1.0 && git push origin v0.1.0`. The `package` job fails closed if the tag
    is not `v` plus the package version. The `publish` job then publishes the exact
-   tarball that was smoke-tested.
+   tarball that was smoke-tested, and passes only once the registry serves that tarball
+   with its provenance attestation and `latest` on it. It waits up to 10 minutes for
+   npm's processing lag. If the job fails after npm accepted the upload, re-run it: a
+   version that is already published is verified, never published again.
 3. Verify from an empty directory:
    ```sh
    npm init -y && npm i @agentidentitytrustprotocol/verifier
