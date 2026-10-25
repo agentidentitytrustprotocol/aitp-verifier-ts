@@ -77,10 +77,20 @@ jobs:
             const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
             if (!r.ok || r.result.implementation !== "aitp-verifier-ts" || r.result.commit !== process.env.GITHUB_SHA) process.exit(1);
           '
-      # The same relative tarball path the publish job uses.
+      # The same relative tarball path the publish job uses. npm refuses even
+      # a dry run over a published version, so once this version is out the
+      # dry run waits for the next version bump.
       - name: Publish dry run
-        working-directory: ${{ runner.temp }}
-        run: npm publish ./pack/*.tgz --dry-run --access public
+        run: |
+          set +e
+          node scripts/verify-published.mjs "$RUNNER_TEMP"/pack/*.tgz --exists
+          rc=$?
+          set -e
+          case $rc in
+            0) echo "::notice::this version is already published; bump it in package.json before the next release" ;;
+            3) cd "$RUNNER_TEMP" && npm publish ./pack/*.tgz --dry-run --access public ;;
+            *) exit "$rc" ;;
+          esac
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package
