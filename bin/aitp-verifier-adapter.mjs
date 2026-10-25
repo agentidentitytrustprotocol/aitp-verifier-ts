@@ -1,22 +1,21 @@
 #!/usr/bin/env node
 // aitp-conformance adapter: NDJSON requests on stdin, one reply per line on
-// stdout. Run with --target bin/aitp-verifier-adapter.mjs after `npm run build`.
+// stdout. From a checkout, run `npm run build` first; an installed package
+// runs as `npx aitp-verifier-adapter`.
 
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
 import { Adapter } from "../dist/adapter.js";
 import * as b64 from "../dist/b64.js";
 import { publicKeyFromRaw } from "../dist/keys.js";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
+// Stamped at build time by scripts/stamp-build.mjs.
 function commit() {
   if (process.env.AITP_ADAPTER_COMMIT) return process.env.AITP_ADAPTER_COMMIT;
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    return JSON.parse(readFileSync(new URL("../dist/build-info.json", import.meta.url), "utf8")).commit;
   } catch {
     return "unknown";
   }
