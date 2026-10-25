@@ -27,12 +27,8 @@ const MEMBERS = ["type", "issuer", "subject", "proof", "public_key", "svid_type"
 export interface IdentityOptions {
   /** Reference time, Unix seconds. */
   readonly now: number;
-  /**
-   * The verifying peer's own AID: the JWT `aud` and the pinned-key proof's
-   * receiver. When it is absent the OIDC `aud` check cannot run and is
-   * skipped, and a pinned-key proof, which binds the receiver, is rejected.
-   */
-  readonly selfAid?: string;
+  /** The verifying peer's own AID: the JWT `aud` and the pinned-key proof's receiver. */
+  readonly selfAid: string;
   /** OIDC issuers this verifier trusts (`trust_anchors`). */
   readonly trustAnchors: readonly string[];
   /** The signing keys of a trusted OIDC issuer (RFC-AITP-0007). */
@@ -122,7 +118,7 @@ async function verifyOidc(identity: JsonObject, sender: Aid, popNonce: string, o
     identityFailed("JWT iat outside the tolerance window");
   }
   if (typeof c.aud !== "string") identityFailed("JWT aud missing");
-  if (options.selfAid !== undefined && c.aud !== options.selfAid) identityFailed("JWT aud is not this verifier");
+  if (c.aud !== options.selfAid) identityFailed("JWT aud is not this verifier");
   if (typeof c.nonce !== "string" || c.nonce !== popNonce) identityFailed("JWT nonce is not the handshake pop_nonce");
   const cnf = c.cnf;
   if (!isJsonObject(cnf) || typeof cnf.jkt !== "string") identityFailed("JWT cnf.jkt missing");
@@ -156,7 +152,6 @@ export async function verifyIdentity(
   const d = checkDescriptor(identity, hint, sender);
   try {
     if (d.type === "oidc") await verifyOidc(d, sender, context.popNonce, options);
-    else if (options.selfAid === undefined) identityFailed("pinned-key proof needs the receiver AID");
     else await verifyPinned(d, { ...context, receiverAid: options.selfAid }, sender, options);
   } catch (e) {
     if (e instanceof AitpError) throw e;

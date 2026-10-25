@@ -120,7 +120,7 @@ export function verifyMutualHelloAck(envelope: unknown, options: HelloAckOptions
 export interface CommitOptions {
   readonly now: number;
   /** This peer's AID: the TCT's `sub` and `aud`. */
-  readonly selfAid?: string;
+  readonly selfAid: string;
   /**
    * The `pop_nonce` this peer sent in round 1, which the commit must echo
    * and sign (§5.3 steps 3–4). Absent only when the caller has already
@@ -163,7 +163,7 @@ export async function verifyCommitPayload(payload: unknown, sender: Aid, options
   if (isJsonObject(token) || typeof token !== "string") fail("TCT_SIGNATURE_INVALID", "tct is not a compact JWS");
   const tct = await verifyTct(token, {
     now: options.now,
-    ...(options.selfAid !== undefined ? { expectedAudience: options.selfAid } : {}),
+    expectedAudience: options.selfAid,
     issuerKey: sender.key,
     ...(options.issuerManifestExpiresAt !== undefined ? { issuerManifestExpiresAt: options.issuerManifestExpiresAt } : {}),
   });

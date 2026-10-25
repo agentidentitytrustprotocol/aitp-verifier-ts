@@ -54,6 +54,16 @@ const REVOCATION_MODES: readonly string[] = ["fail_closed", "fail_open", "soft_f
 
 class NotSupported extends Error {}
 
+/** A request missing an input the op needs: the adapter protocol's MALFORMED_REQUEST. */
+class MalformedRequest extends Error {}
+
+/** The receiving peer's own AID; every receive-side op needs it. */
+function selfAidOf(params: JsonObject): string {
+  const v = params.self_aid;
+  if (typeof v !== "string") throw new MalformedRequest("self_aid is required");
+  return v;
+}
+
 /** State a sequence fixture carries from one step to the next. */
 interface FixtureState {
   replay: ReplayCache;
@@ -138,6 +148,7 @@ export class Adapter {
     } catch (e) {
       if (e instanceof AitpError) return { id, ok: false, error_code: e.code, message: e.message };
       if (e instanceof NotSupported) return { id, ok: false, error_code: "OP_NOT_SUPPORTED", message: e.message };
+      if (e instanceof MalformedRequest) return { id, ok: false, error_code: "MALFORMED_REQUEST", message: e.message };
       return { id, ok: false, error_code: "INTERNAL_ERROR", message: (e as Error).message ?? String(e) };
     }
   }
@@ -274,7 +285,7 @@ export class Adapter {
     if (isJsonObject(p.peer_a) || isJsonObject(p.peer_b)) return this.#verifyBothCommits(p);
     const envelope = p.envelope;
     if (!isJsonObject(envelope)) throw new Error("verify_handshake_payload without an envelope");
-    const selfAid = str(p, "self_aid");
+    const selfAid = selfAidOf(p);
     const type = envelope.message_type;
     if (type === "mutual_commit" || type === "mutual_commit_ack") {
       const own = str(p, type === "mutual_commit" ? "self_pop_nonce_sent_in_hello_ack" : "self_pop_nonce_sent_in_hello");
@@ -282,7 +293,7 @@ export class Adapter {
       const c = await verifyMutualCommit(envelope, type, {
         now: this.#now,
         replay: this.#state.replay,
-        ...(selfAid !== undefined ? { selfAid } : {}),
+        selfAid,
         ...(own !== undefined ? { ownPopNonce: own } : {}),
         ...(bound !== undefined ? { grantBound: bound } : {}),
       });
@@ -293,7 +304,7 @@ export class Adapter {
     const options = {
       now: this.#now,
       replay: this.#state.replay,
-      ...(selfAid !== undefined ? { selfAid } : {}),
+      selfAid,
       trustAnchors: strings(p, "self_trust_anchors") ?? DEFAULT_TRUST_ANCHORS,
       resolveIssuerKeys: (issuer: string) => this.#options.oidcIssuers.get(issuer) ?? [],
       pinnedKeys: trustStore,
@@ -324,10 +335,10 @@ export class Adapter {
     for (const key of ["peer_a", "peer_b"]) {
       const peer = p[key];
       if (!isJsonObject(peer)) continue;
+      const selfAid = selfAidOf(peer);
       const payload = peer.received_payload;
       const issuer = aidOf(isJsonObject(payload) ? peekClaims(payload.tct)?.iss : undefined);
       if (issuer === undefined) fail("TCT_SIGNATURE_INVALID", `${key}: the TCT names no issuer`);
-      const selfAid = str(peer, "self_aid");
       const own =
         peer.received_envelope_message_type === "mutual_commit"
           ? str(peer, "self_pop_nonce_sent_in_hello_ack")
@@ -336,7 +347,7 @@ export class Adapter {
       const c = await verifyCommitPayload(payload, issuer, {
         now: this.#now,
         ownPopNonce: own,
-        ...(selfAid !== undefined ? { selfAid } : {}),
+        selfAid,
       });
       for (const g of c.tct.grants) grants.add(g);
     }
@@ -515,7 +526,14 @@ export class Adapter {
   }
 
   async #verifyDelegationToken(p: JsonObject): Promise<JsonObject> {
-    if (!("delegation_token" in p)) throw new NotSupported("the v0.1 delegation object is not supported");
+    if (!("delegation_token" in p)) {
+      // The frozen v0.1 delegation object: a `chain` is refused before
+      // anything else is read. Any other v0.1 shape is not verified here.
+      if (isJsonObject(p.delegation) && "chain" in p.delegation) {
+        fail("DELEGATION_MULTIHOP_NOT_SUPPORTED", "multi-hop delegation (RFC-AITP-0011) is not supported");
+      }
+      throw new NotSupported("the v0.1 delegation object is not supported");
+    }
     const now = this.#nowFrom(p);
     const self = configAid(p.self_aid, "self_aid");
     const manifests = Array.isArray(p.issuer_manifests) ? p.issuer_manifests : [];
