@@ -30,6 +30,16 @@ test("adapter: init advertises every op it dispatches", async () => {
   eq(errorCode(await call(a, "verify_delegation_token", { delegation: { chain: [] } })), "DELEGATION_MULTIHOP_NOT_SUPPORTED");
 });
 
+// Feature-gated fixtures (the ren-* renewal set behind experimental-renewal,
+// required_for_core: false) are skipped by the runner only while the
+// adapter does not claim the feature. This verifier implements no
+// extension features, so it claims none.
+test("adapter: init advertises no features", async () => {
+  const r = await call(adapter(), "init", { version: "1" });
+  assert(r.ok, "init succeeds");
+  eq((r.result.supported_features as string[]).length, 0);
+});
+
 test("adapter: an unknown op is a skip, not a failure", async () => {
   eq(errorCode(await call(adapter(), "verify_session_bundle")), "OP_NOT_SUPPORTED");
 });
