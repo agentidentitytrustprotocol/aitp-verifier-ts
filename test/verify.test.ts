@@ -34,7 +34,9 @@ interface Peer {
 async function peer(id: string): Promise<Peer> {
   const v = vector("keypairs.json", id);
   const key =
-    v.algorithm === "p256" ? await p256FromScalar(fromHex(str(v, "private_scalar_hex"))) : await ed25519FromSeed(fromHex(str(v, "seed_hex")));
+    v.algorithm === "p256"
+      ? await p256FromScalar(fromHex(str(v, "private_scalar_hex")))
+      : await ed25519FromSeed(fromHex(str(v, "seed_hex")));
   const aid = parseAid(aidFor(key.publicKey));
   if (aid === undefined) throw new Error(id);
   return { key, aid };
@@ -185,7 +187,10 @@ test("tct: holder-side verification and its codes", async () => {
   await expectCode(verifyTct(await sign({ ...claims, ver: "aitp/0.2" }), { now: NOW }), "UNKNOWN_VERSION");
   await expectCode(verifyTct(await sign({ ...claims, jti: "not-a-uuid" }), { now: NOW }), "TCT_SIGNATURE_INVALID");
   await expectCode(verifyTct(await sign({ ...claims, aud: C.aid.text }), { now: NOW }), "TCT_SIGNATURE_INVALID", "aud ≠ sub");
-  await expectCode(verifyTct(await sign({ ...claims, cnf: { jkt: await jwkThumbprint(C.aid.key) } }), { now: NOW }), "TCT_SIGNATURE_INVALID");
+  await expectCode(
+    verifyTct(await sign({ ...claims, cnf: { jkt: await jwkThumbprint(C.aid.key) } }), { now: NOW }),
+    "TCT_SIGNATURE_INVALID",
+  );
   await expectCode(verifyTct(await sign(await tctClaims(A, A)), { now: NOW }), "TCT_SIGNATURE_INVALID", "self-issued");
   await expectCode(verifyTct(await sign({ ...claims, grants: ["aitp.attestation"] }), { now: NOW }), "TCT_SIGNATURE_INVALID");
   await expectCode(verifyTct(await signCompactJws(C.key, "aitp-tct+jwt", claims), { now: NOW }), "TCT_SIGNATURE_INVALID", "forged");
@@ -360,10 +365,7 @@ test("handshake: pinned-key MUTUAL_HELLO through policy", async () => {
   eq(hello.identity.type, "pinned_key");
   await expectCode(verifyMutualHello(await sign(payload), { ...options, pinnedKeys: [] }), "IDENTITY_FAILED");
   await expectCode(verifyMutualHello(await sign(payload), { ...options, selfAid: B.aid.text }), "IDENTITY_FAILED", "other receiver");
-  await expectCode(
-    verifyMutualHello(await sign(payload), { ...options, acceptedIdentityTypes: ["oidc"] }),
-    "INCOMPATIBLE_IDENTITY_TYPE",
-  );
+  await expectCode(verifyMutualHello(await sign(payload), { ...options, acceptedIdentityTypes: ["oidc"] }), "INCOMPATIBLE_IDENTITY_TYPE");
   await expectCode(verifyMutualHello(await sign({ ...payload, extra: 1 }), options), "UNKNOWN_FIELD");
   await expectCode(verifyMutualHello(await sign({ ...payload, manifest: await manifest(B) }), options), "INVALID_ENVELOPE");
   const e = await sign(payload);

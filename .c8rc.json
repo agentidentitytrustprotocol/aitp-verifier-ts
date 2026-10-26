@@ -1,0 +1,12 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": ["build-test/src/**", "src/**"],
+  "exclude": ["src/errors.ts", "src/index.ts", "build-test/src/errors.js", "build-test/src/index.js"],
+  "reporter": ["text", "text-summary"],
+  "check-coverage": true,
+  "lines": 88,
+  "statements": 88,
+  "functions": 84,
+  "branches": 70
+}

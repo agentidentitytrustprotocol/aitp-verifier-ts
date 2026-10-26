@@ -84,6 +84,7 @@ test("jcs: RFC 8785 number serialization", () => {
     [5e-324, "5e-324"],
     [1.7976931348623157e308, "1.7976931348623157e+308"],
     [9007199254740992, "9007199254740992"],
+    // biome-ignore lint/correctness/noPrecisionLoss: the RFC 8785 vector is this literal, rounded at parse time.
     [333333333.33333329, "333333333.3333333"],
     [4.5, "4.5"],
     [0.002, "0.002"],
@@ -100,10 +101,13 @@ test("jcs: UTF-16 key order and string escaping (RFC 8785 §3.2.3)", () => {
   );
   // Read the order off the output itself: Object.keys would list "1" first.
   const out = canonicalize(obj);
-  const at = (k: string) => out.indexOf(JSON.stringify(k) + ":");
+  const at = (k: string) => out.indexOf(`${JSON.stringify(k)}:`);
   const order = ["\r", "1", "\u0080", "\u00f6", "\u20ac", "\ud83d\ude00", "\ufb33"].map(at);
-  assert(order.every((i, n) => i >= 0 && (n === 0 || i > (order[n - 1] as number))), `order ${order.join()}`);
-  eq(canonicalize({ s: "\u0000\u001f\b\f\n\r\t\"\\/\u007f é" }), '{"s":"\\u0000\\u001f\\b\\f\\n\\r\\t\\"\\\\/\u007f é"}');
+  assert(
+    order.every((i, n) => i >= 0 && (n === 0 || i > (order[n - 1] as number))),
+    `order ${order.join()}`,
+  );
+  eq(canonicalize({ s: '\u0000\u001f\b\f\n\r\t"\\/\u007f é' }), '{"s":"\\u0000\\u001f\\b\\f\\n\\r\\t\\"\\\\/\u007f é"}');
   eq(canonicalize({ b: [true, false, null, { z: 1, a: [] }], a: {} }), '{"a":{},"b":[true,false,null,{"a":[],"z":1}]}');
   throws(() => canonicalize({ s: "\ud800" }));
   throws(() => canonicalize({ n: Infinity }));
@@ -150,7 +154,16 @@ test("jws: strict compact parsing", () => {
   eq(parseCompactJws(`${h}.${p}.${s}`).claims.ver, "aitp/0.3");
   const dup = b64.encode(utf8('{"aud":"a","aud":"b"}'));
   const arr = b64.encode(utf8("[1]"));
-  for (const bad of [`${h}.${p}`, `${h}.${p}.${s}.${s}`, `${h}..${s}`, `${h}.${p}.`, `${h}=.${p}.${s}`, `${h}.${dup}.${s}`, `${h}.${arr}.${s}`, `${h}.${p}.${s}=`]) {
+  for (const bad of [
+    `${h}.${p}`,
+    `${h}.${p}.${s}.${s}`,
+    `${h}..${s}`,
+    `${h}.${p}.`,
+    `${h}=.${p}.${s}`,
+    `${h}.${dup}.${s}`,
+    `${h}.${arr}.${s}`,
+    `${h}.${p}.${s}=`,
+  ]) {
     let threw = false;
     try {
       parseCompactJws(bad);

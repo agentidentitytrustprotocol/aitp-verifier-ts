@@ -17,7 +17,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = join(ROOT, "vendor", "spec", "registries", "error-codes.md");
 const OUT = join(ROOT, "src", "errors.ts");
 
-const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+const cells = (line) =>
+  line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => c.trim());
 
 const codes = new Map();
 let header = null;

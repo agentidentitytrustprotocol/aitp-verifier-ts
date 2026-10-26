@@ -132,7 +132,13 @@ function oidcIdentity(vec, proof, keys) {
     { type: "oidc", issuer: vec.issuer, subject: vec.subject },
     contextOf(vec.envelope),
     aid(vec.envelope.sender.agent_id),
-    { now: minted.oidc_identity.now + 100, selfAid: vec.self_aid, trustAnchors: [vec.issuer], resolveIssuerKeys: () => keys, pinnedKeys: [] },
+    {
+      now: minted.oidc_identity.now + 100,
+      selfAid: vec.self_aid,
+      trustAnchors: [vec.issuer],
+      resolveIssuerKeys: () => keys,
+      pinnedKeys: [],
+    },
   );
 }
 

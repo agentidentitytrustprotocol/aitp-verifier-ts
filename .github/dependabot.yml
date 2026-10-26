@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Keep the SHA-pinned actions in .github/workflows fresh.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # devDependencies only: the package has no runtime dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+      major-updates:
+        update-types: ["major"]

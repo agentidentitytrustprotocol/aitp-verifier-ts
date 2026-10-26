@@ -17,7 +17,13 @@ import { isExpired } from "./timeutil.js";
 import { aidOf, fail } from "./verify/common.js";
 import { verifyDelegation, verifyVoucher } from "./verify/delegation.js";
 import { verifyEnvelope } from "./verify/envelope.js";
-import { verifyCommitPayload, verifyMutualCommit, verifyMutualHello, verifyMutualHelloAck } from "./verify/handshake.js";
+import {
+  type VerifiedHello,
+  verifyCommitPayload,
+  verifyMutualCommit,
+  verifyMutualHello,
+  verifyMutualHelloAck,
+} from "./verify/handshake.js";
 import { type IdentityType, verifyManifest } from "./verify/manifest.js";
 import { type PopChallenge, verifyPopChallenge, verifyPopResponse } from "./verify/pop.js";
 import { ReplayCache } from "./verify/replay.js";
@@ -30,9 +36,7 @@ export interface AdapterRequest {
   readonly params?: JsonObject;
 }
 
-export type AdapterReply =
-  | { id: string; ok: true; result: JsonObject }
-  | { id: string; ok: false; error_code: string; message: string };
+export type AdapterReply = { id: string; ok: true; result: JsonObject } | { id: string; ok: false; error_code: string; message: string };
 
 export interface AdapterInfo {
   readonly implementation: string;
@@ -310,7 +314,7 @@ export class Adapter {
       pinnedKeys: trustStore,
       ...(accepted !== undefined ? { acceptedIdentityTypes: accepted } : {}),
     };
-    let hello;
+    let hello: VerifiedHello;
     if (type === "mutual_hello_ack") {
       const sent = str(p, "sent_pop_nonce");
       if (sent === undefined) throw new Error("a mutual_hello_ack fixture needs sent_pop_nonce");
@@ -512,7 +516,11 @@ export class Adapter {
     const usable =
       sameKeyAid(v.issuer, issuer) && !isExpired(v.expiresAt, now) && (maxStaleness === undefined || now - v.publishedAt <= maxStaleness);
     const jti = str(p, "queried_jti");
-    const status: RevocationStatus = !usable ? "unknown" : jti !== undefined && v.entries.some((e) => e.jti === jti) ? "revoked" : "not_revoked";
+    const status: RevocationStatus = !usable
+      ? "unknown"
+      : jti !== undefined && v.entries.some((e) => e.jti === jti)
+        ? "revoked"
+        : "not_revoked";
     const d = decideRevocation(status, mode);
     if (!d.allowed) fail("TCT_REVOKED", status === "revoked" ? "jti is revoked" : "snapshot unusable under fail_closed");
     return { status, degraded: d.degraded, entries: v.entries.length };

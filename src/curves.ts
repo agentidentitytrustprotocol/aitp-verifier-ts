@@ -89,7 +89,7 @@ function edDouble(p: EdPoint): EdPoint {
   const b = (p.y * p.y) % ED_P;
   const c = (2n * p.z * p.z) % ED_P;
   const h = (a + b) % ED_P;
-  const e = mod(h - ((p.x + p.y) * (p.x + p.y)), ED_P);
+  const e = mod(h - (p.x + p.y) * (p.x + p.y), ED_P);
   const g = mod(a - b, ED_P);
   const f = (c + g) % ED_P;
   return { x: (e * f) % ED_P, y: (g * h) % ED_P, t: (e * h) % ED_P, z: (f * g) % ED_P };
