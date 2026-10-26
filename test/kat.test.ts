@@ -140,8 +140,17 @@ test("kat-pinned-key-proof-*: proof input and signature", async () => {
   new DataView(ts.buffer).setBigInt64(0, BigInt(v.timestamp as number));
   const nul = new Uint8Array([0]);
   const be = concat(
-    utf8("aitp-pinned-key-v1"), nul, utf8(str(v, "sender_aid")), nul, utf8(str(v, "receiver_aid")), nul,
-    utf8(str(v, "message_id")), nul, ts, nul, b64.decode(str(v, "pop_nonce")),
+    utf8("aitp-pinned-key-v1"),
+    nul,
+    utf8(str(v, "sender_aid")),
+    nul,
+    utf8(str(v, "receiver_aid")),
+    nul,
+    utf8(str(v, "message_id")),
+    nul,
+    ts,
+    nul,
+    b64.decode(str(v, "pop_nonce")),
   );
   await notOk(verifyJcsSignature(aid(str(v, "signer_aid")).key, be, str(v, "signature_b64url")), "big-endian timestamp");
   // -003's input carries the tagged sender string, so -001's proof fails there.
@@ -212,7 +221,7 @@ test("signature-strictness: §5.4.7 rejections", async () => {
   eq(await verifyJcsPrimitive(key3, input3, zero), false, "r = 0");
 });
 
-const SE = KAT + "signed-examples/";
+const SE = `${KAT}signed-examples/`;
 
 function signedJws(file: string, member: string): { file: JsonObject; token: string } {
   const f = readJson(SE + file);
@@ -307,7 +316,10 @@ test("signed-examples: Manifests sign the body; PoP signs the challenge", async 
     await ok(verifyJcsSignature(key, popInput(str(pop, "challenge")), str(pop, "signature")));
     if (isJsonObject(f._must_not_verify)) {
       await notOk(verifyJcsSignature(key, body, str(f._must_not_verify, "double_hash_signature")), "double hash");
-      await notOk(verifyJcsSignature(key, popInput(str(pop, "challenge")), str(f._must_not_verify, "double_hash_pop_signature")), "double hash PoP");
+      await notOk(
+        verifyJcsSignature(key, popInput(str(pop, "challenge")), str(f._must_not_verify, "double_hash_pop_signature")),
+        "double hash PoP",
+      );
     } else {
       eq(await signJcs(await privateKey(str(f._kat_input as JsonObject, "issuer_seed_id")), body), str(m, "signature"), "re-sign");
     }
@@ -329,7 +341,7 @@ test("signed-examples: revocation snapshots sign the inner list", async () => {
 });
 
 test("signed-examples: session bundle signs its body", async () => {
-  const f = readJson(SE + "session-bundle/kat-keypair-001-bundle.json");
+  const f = readJson(`${SE}session-bundle/kat-keypair-001-bundle.json`);
   const bundle = f.session_bundle as JsonObject;
   const key = aid(str(bundle, "coordinator")).key;
   const body = canonicalBytes(withoutSignature(bundle));

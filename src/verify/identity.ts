@@ -11,7 +11,7 @@
 import { type Aid, aidIdentifier, sameKeyAid } from "../aid.js";
 import * as b64 from "../b64.js";
 import { AitpError } from "../errors.js";
-import { JwsFormatError, parseCompactJws, verifyJwsSignature, expectedAlg } from "../jws.js";
+import { type CompactJws, JwsFormatError, parseCompactJws, verifyJwsSignature, expectedAlg } from "../jws.js";
 import { type JsonObject, isJsonObject } from "../json.js";
 import { type PublicKey, publicKeyFromRaw } from "../keys.js";
 import { jwkThumbprint } from "../jwk.js";
@@ -93,7 +93,7 @@ async function verifyOidc(identity: JsonObject, sender: Aid, popNonce: string, o
   // Check 2: never resolve keys for an issuer this verifier does not trust.
   if (!options.trustAnchors.includes(issuer)) fail("INCOMPATIBLE_TRUST_ANCHORS", "OIDC issuer is not a trust anchor");
   // Check 3, RFC-AITP-0002 §2.3.
-  let jwt;
+  let jwt: CompactJws;
   try {
     jwt = parseCompactJws(identity.proof as string);
   } catch (e) {

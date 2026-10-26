@@ -4,7 +4,8 @@
     "lib": ["ES2022", "DOM"],
     "types": ["node"],
     "rootDir": ".",
-    "outDir": "build-test"
+    "outDir": "build-test",
+    "sourceMap": true
   },
   "include": ["src", "test"]
 }

@@ -40,7 +40,10 @@ export interface PrivateKey {
 
 /** The runtime has no WebCrypto, or no support for the algorithm. */
 export class AlgorithmUnavailableError extends Error {
-  constructor(readonly alg: Alg, cause?: unknown) {
+  constructor(
+    readonly alg: Alg,
+    cause?: unknown,
+  ) {
     super(`${alg} is not available in this runtime's WebCrypto`, { cause });
     this.name = "AlgorithmUnavailableError";
   }
@@ -94,9 +97,7 @@ async function importPublic(key: PublicKey): Promise<CryptoKey> {
     if (key.alg === "ed25519") {
       return await s.importKey("raw", buf(key.raw), { name: "Ed25519" }, false, ["verify"]);
     }
-    return await s.importKey("jwk", { ...publicJwk(key), ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, [
-      "verify",
-    ]);
+    return await s.importKey("jwk", { ...publicJwk(key), ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
   } catch (e) {
     if (key.alg === "ed25519") throw new AlgorithmUnavailableError("ed25519", e);
     throw e;

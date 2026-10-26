@@ -14,13 +14,13 @@ export interface MemberCheck {
 export function checkMembers(obj: JsonObject, required: readonly string[], optional: readonly string[] = []): MemberCheck {
   const allowed = new Set([...required, ...optional]);
   return {
-    missing: required.filter((k) => !Object.prototype.hasOwnProperty.call(obj, k)),
+    missing: required.filter((k) => !Object.hasOwn(obj, k)),
     unknown: Object.keys(obj).filter((k) => !allowed.has(k)),
   };
 }
 
 export function has(obj: JsonObject, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(obj, key);
+  return Object.hasOwn(obj, key);
 }
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

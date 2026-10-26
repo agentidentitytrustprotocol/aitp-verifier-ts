@@ -13,11 +13,9 @@ An independent TypeScript verifier for the
   commit are vendored under `vendor/spec/`. CI checks both against a spec
   checkout at the pin. `src/errors.ts` is generated from the registry.
 
-> Status: TS4.4 of the
-> [adoption plan](https://github.com/agentidentitytrustprotocol/agentidentitytrustprotocol/blob/main/plans/cross-repo/aitp-ts-verifier-adoption-90-day.md).
-> Under `aitp-conformance` the adapter passes the "AITP v0.3" core claim at
-> the pinned spec commit with no core fixture skipped. Artifacts that aitp-rs
-> mints verify here. Releases publish to npm from CI with provenance.
+> Status: released on npm as 0.1.0. Under `aitp-conformance` the adapter
+> passes the "AITP v0.3" core claim at the pinned spec commit with no core
+> fixture skipped. Artifacts that aitp-rs mints verify here. Releases publish to npm from CI with provenance.
 
 ## Install
 
@@ -108,6 +106,9 @@ neither as a binary, so CI builds them.
 | Check | What it proves |
 |---|---|
 | `spec pin + generated files` | `vendor/spec` and `src/errors.ts` match the spec at the pin; strict types; no runtime dependencies |
+| `format` | `biome format`: the sources, tests, scripts and JSON are formatted |
+| `lint` | `biome lint` at zero warnings |
+| `coverage` | the suite under `c8`, failing below the floors in `.c8rc.json` |
 | `tests (node 20)`, `tests (node 22)`, `tests (deno)` | the known-answer, primitive, verifier and adapter suites |
 | `conformance (aitp-conformance)` | the adapter passes every gate with zero core skips; the report validates against `aitp-conformance-report.schema.json` and `check-conformance-report.py`, and is uploaded |
 | `mint (aitp-rs) -> verify` | artifacts aitp-rs mints in that run verify here byte for byte, and the negatives (high-S, untagged, double-hashed, withheld or confused keys) fail |
@@ -187,6 +188,9 @@ npm ci
 npm test              # Node: compile the suite, then run it
 deno run --allow-read=. build-test/test/run.js   # Deno, on the same build
 npm run typecheck
+npm run format:check  # npm run format rewrites
+npm run lint
+npm run coverage      # the suite under c8, gated by .c8rc.json
 npm run check:errors  # src/errors.ts vs the vendored registry
 npm run check:spec    # vendor/spec vs ../agentidentitytrustprotocol at the pin
 ```

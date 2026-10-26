@@ -12,13 +12,7 @@ import * as b64 from "../b64.js";
 import { type JsonObject, isJsonObject } from "../json.js";
 import { verifyJcsSignature } from "../sigfield.js";
 import { NONCE_PATTERN, fail, isCapability, unknownMembers } from "./common.js";
-import {
-  type EnvelopeOptions,
-  type VerifiedEnvelope,
-  checkEnvelope,
-  checkEnvelopeSignature,
-  recordEnvelope,
-} from "./envelope.js";
+import { type EnvelopeOptions, type VerifiedEnvelope, checkEnvelope, checkEnvelopeSignature, recordEnvelope } from "./envelope.js";
 import { type IdentityOptions, type VerifiedIdentity, verifyIdentity } from "./identity.js";
 import { type IdentityType, type ParsedManifest, checkManifestPop, checkManifestSignature, parseManifest } from "./manifest.js";
 import { type VerifiedTct, verifyTct } from "./tct.js";

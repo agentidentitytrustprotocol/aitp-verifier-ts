@@ -33,13 +33,7 @@ const REQUIRED = [
   "expires_at",
   "signature",
 ];
-const OPTIONAL = [
-  "display_name",
-  "required_peer_capabilities",
-  "accepted_identity_types",
-  "accepted_signature_algorithms",
-  "extensions",
-];
+const OPTIONAL = ["display_name", "required_peer_capabilities", "accepted_identity_types", "accepted_signature_algorithms", "extensions"];
 const HINT_MEMBERS = ["type", "issuer", "subject", "public_key"];
 const IDENTITY_TYPES = ["oidc", "pinned_key", "spiffe"];
 const SPIFFE_ID = /^spiffe:\/\/[a-z0-9._-]{1,255}(\/([A-Za-z0-9._-]*[A-Za-z0-9_-][A-Za-z0-9._-]*|\.{3,}))+$/;
