@@ -233,6 +233,25 @@ These codes are reserved for Session Trust Bundles (RFC-AITP-0010 is Draft and n
 | `BUNDLE_NOT_MEMBER` | Receiver's AID is not in `participants[*].aid`. | draft |
 | `SESSION_BUNDLE_INVALID` | Aggregate fallback — implementations MAY return this when a deployment policy requires a single-error surface for bundles, in lieu of the specific codes above. | draft |
 
+## TCT renewal codes (RFC-AITP-0013, opt-in)
+
+TCT renewal (RFC-AITP-0013 is Draft and not part of core conformance) registers no code of its own. It reuses the codes below, each defined in its own table above; this table gives the meaning each takes in renewal. An issuer that does not offer renewal advertises no `renew_uri` and emits none of them for renewal.
+
+| Step | Code | Meaning in renewal |
+|---|---|---|
+| Issuer, [§4](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#4-issuer-processing) step 1 | `POP_RESPONSE_INVALID` | The renewal request is not an object with exactly `current_tct`, `pop_nonce` and `pop_signature`, or `pop_nonce` is not 16 bytes in 22 unpadded base64url characters. |
+| Issuer, §4 step 2 | `TCT_SIGNATURE_INVALID`, `TOKEN_TYP_MISMATCH`, `TOKEN_ALG_MISMATCH`, `UNKNOWN_FIELD` | `current_tct` fails RFC-AITP-0005 §7.2 as read by its issuer: not issued by this issuer, `aud` ≠ `sub`, or a grant-context defect. |
+| Issuer, §4 step 2 | `TCT_EXPIRED` | `current_tct` has expired. An expired TCT is never renewed. |
+| Issuer, §4 step 2 | `TCT_EXPIRES_AFTER_MANIFEST` | `current_tct.exp` exceeds the issuer's current Manifest `expires_at`. |
+| Issuer, §4 step 3 | `POP_RESPONSE_INVALID` | `pop_signature` does not verify under the `sub` key over the renewal PoP input (RFC-AITP-0013 §3.1). |
+| Issuer, §4 step 4 | `TCT_REVOKED` | `current_tct.jti` is in the issuer's deny list. |
+| Issuer, §4 step 5 | `REPLAY_DETECTED` | The issuer has already accepted a renewal request with this `pop_nonce`. |
+| Issuer, §4 step 6 | `POLICY_VIOLATION` | No grant survives re-evaluation against the issuer's current Manifest and policy, or policy refuses renewal to this holder. |
+| Holder, [§6.1](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#61-holder-verification) step 2 | `PEER_MISMATCH` | The response envelope's `sender.agent_id` is not the current TCT's `iss`. |
+| Holder, §6.1 step 3 | `NONCE_MISMATCH` | `pop_nonce_echo` is not the `pop_nonce` the holder sent. |
+| Holder, §6.1 step 5 | `AUDIENCE_MISMATCH` | The renewed TCT's `sub` is not the holder, or its `cnf.jkt` differs from the current TCT's. |
+| Holder, §6.1 step 6 | `GRANT_OVERFLOW` | The renewed TCT carries a grant the current TCT does not. |
+
 ## Adding a code
 
 Open a PR adding a row to one of the tables above. Verifiers MUST NOT reveal which specific policy check failed beyond the registered code; `reason` strings are informational only.
