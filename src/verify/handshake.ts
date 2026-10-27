@@ -42,8 +42,15 @@ export interface HelloOptions extends EnvelopeOptions, Omit<IdentityOptions, "no
 }
 
 export interface HelloAckOptions extends HelloOptions {
-  /** The `pop_nonce` this peer sent in its MUTUAL_HELLO (§5.2 step 8). */
+  /** The `pop_nonce` this peer sent in its MUTUAL_HELLO (§5.2 step 9). */
   readonly sentPopNonce: string;
+  /**
+   * The AID this peer addressed in its MUTUAL_HELLO: the intended peer
+   * (RFC-AITP-0004 §2). The ACK's sender must be this AID (§5.2 step 3,
+   * `PEER_MISMATCH`). Take it from the Manifest you fetched, never from
+   * the ACK.
+   */
+  readonly peerAid: string;
 }
 
 export interface VerifiedHello {
@@ -58,7 +65,7 @@ async function verifyRoundOne(
   envelope: unknown,
   type: "mutual_hello" | "mutual_hello_ack",
   options: HelloOptions,
-  sentPopNonce?: string,
+  ack?: { readonly sentPopNonce: string; readonly peerAid: string },
 ): Promise<VerifiedHello> {
   // 1. Envelope, unauthenticated.
   const v = checkEnvelope(envelope, options);
@@ -71,7 +78,9 @@ async function verifyRoundOne(
   if (!Array.isArray(grants) || !grants.every(isCapability)) fail("INVALID_ENVELOPE", "payload.requested_grants");
   if (!isNonceString(p.pop_nonce)) fail("INVALID_ENVELOPE", "payload.pop_nonce");
   if (type === "mutual_hello_ack" && !isNonceString(p.pop_nonce_echo)) fail("INVALID_ENVELOPE", "payload.pop_nonce_echo");
-  // 3. One AID anchors everything that follows.
+  // §5.2 step 3: the ACK comes from the peer the initiator addressed.
+  if (ack !== undefined && v.sender.text !== ack.peerAid) fail("PEER_MISMATCH", "MUTUAL_HELLO_ACK sender is not the peer we addressed");
+  // 3 (§5.2 step 4). One AID anchors everything that follows.
   if (p.manifest.aid !== v.sender.text) fail("INVALID_ENVELOPE", "manifest.aid is not the envelope sender");
   const manifest = parseManifest(p.manifest);
   if (isExpired(manifest.expiresAt, options.now)) fail("MANIFEST_EXPIRED", "inline Manifest has expired");
@@ -88,8 +97,8 @@ async function verifyRoundOne(
   );
   // 7. Envelope signature under the authenticated key.
   await checkEnvelopeSignature(v, manifest.aid.key);
-  // §5.2 step 8.
-  if (sentPopNonce !== undefined && p.pop_nonce_echo !== sentPopNonce) fail("NONCE_MISMATCH", "pop_nonce_echo is not our pop_nonce");
+  // §5.2 step 9.
+  if (ack !== undefined && p.pop_nonce_echo !== ack.sentPopNonce) fail("NONCE_MISMATCH", "pop_nonce_echo is not our pop_nonce");
   // 8. Policy.
   if (options.acceptedIdentityTypes !== undefined) {
     if (!options.acceptedIdentityTypes.includes(identity.type)) fail("INCOMPATIBLE_IDENTITY_TYPE", `${identity.type} is not accepted`);
@@ -108,7 +117,7 @@ export function verifyMutualHello(envelope: unknown, options: HelloOptions): Pro
 
 /** §5.2: A verifies B's MUTUAL_HELLO_ACK. */
 export function verifyMutualHelloAck(envelope: unknown, options: HelloAckOptions): Promise<VerifiedHello> {
-  return verifyRoundOne(envelope, "mutual_hello_ack", options, options.sentPopNonce);
+  return verifyRoundOne(envelope, "mutual_hello_ack", options, { sentPopNonce: options.sentPopNonce, peerAid: options.peerAid });
 }
 
 export interface CommitOptions {

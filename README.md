@@ -13,7 +13,7 @@ An independent TypeScript verifier for the
   commit are vendored under `vendor/spec/`. CI checks both against a spec
   checkout at the pin. `src/errors.ts` is generated from the registry.
 
-> Status: released on npm as 0.1.0. Under `aitp-conformance` the adapter
+> Status: released on npm as 0.1.1. Under `aitp-conformance` the adapter
 > passes the "AITP v0.3" core claim at the pinned spec commit with no core
 > fixture skipped. Artifacts that aitp-rs mints verify here. Releases publish to npm from CI with provenance.
 
@@ -54,7 +54,7 @@ code, and each verifier runs its checks in the order its RFC fixes.
 | `verifyEnvelope` | Envelope replay, timestamp window, version, structure, member set, then signature. | RFC-AITP-0001 §5; RFC-AITP-0009 §3.1 |
 | `verifyManifest` | Manifest version, structure, member set, expiry, proof of possession, then signature. | RFC-AITP-0003 §5 |
 | `verifyIdentity` | OIDC and pinned-key identity bindings, with the trust-anchor check before any key resolution. | RFC-AITP-0002; RFC-AITP-0004 §5.1 step 6 |
-| `verifyMutualHello`, `verifyMutualHelloAck` | Round 1 of the handshake: the trust bootstrap from the inline Manifest, identity, then policy. | RFC-AITP-0004 §5.1, §5.2 |
+| `verifyMutualHello`, `verifyMutualHelloAck` | Round 1 of the handshake: the trust bootstrap from the inline Manifest, identity, then policy. `verifyMutualHelloAck` takes `peerAid`, the AID you addressed, and rejects an ACK from any other sender with `PEER_MISMATCH`. | RFC-AITP-0004 §5.1, §5.2 |
 | `verifyMutualCommit`, `verifyCommitPayload` | Round 2: nonce echo, PoP signature, the TCT, then grant bounds. | RFC-AITP-0004 §5.3, §5.4 |
 | `verifyTct` | Holder-side TCT verification, with revocation behind a callback that is only reached last. | RFC-AITP-0005 §7.2 |
 | `verifyTctAsIssuer` | A TCT presented back to its issuer, with downstream proof of possession. | RFC-AITP-0005 §10.5 |
