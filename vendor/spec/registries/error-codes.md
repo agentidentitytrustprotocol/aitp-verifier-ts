@@ -32,7 +32,7 @@ same code.
 | Artifact | Structural rejection code |
 |---|---|
 | Envelope | `INVALID_ENVELOPE` |
-| Handshake payload | `INVALID_ENVELOPE` — the payload is a member of the envelope, and RFC-AITP-0004 §5.2 step 3 and §6 already map payload-level defects this way |
+| Handshake payload | `INVALID_ENVELOPE` — the payload is a member of the envelope, and RFC-AITP-0004 §5.2 step 4 and §6 already map payload-level defects this way |
 | Manifest | `MANIFEST_INVALID` |
 | Identity descriptor | `IDENTITY_FAILED` |
 | Revocation snapshot | `REVOCATION_SNAPSHOT_INVALID` |
@@ -141,6 +141,7 @@ Returned in error envelopes during the four-message handshake.
 | `MANIFEST_POP_FAILED` | Peer's Manifest PoP failed. | core |
 | `POP_VERIFICATION_FAILED` | Round-2 PoP signature failed. | core |
 | `NONCE_MISMATCH` | `pop_nonce_echo` mismatch. | core |
+| `PEER_MISMATCH` | `MUTUAL_HELLO_ACK` sender is not the AID the initiator addressed in MUTUAL_HELLO ([RFC-AITP-0004 §5.2](../rfcs/RFC-AITP-0004-mutual-handshake.md#52-on-receiving-mutual_hello_ack-a-verifies-b) step 3). | core |
 | `AUDIENCE_MISMATCH` | TCT `aud` ≠ self AID. | core |
 | `GRANT_OVERFLOW` | TCT grants exceed peer's `offered_capabilities`. | core |
 | `TCT_EXPIRED` | TCT already expired. | core |

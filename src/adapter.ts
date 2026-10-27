@@ -318,7 +318,11 @@ export class Adapter {
     if (type === "mutual_hello_ack") {
       const sent = str(p, "sent_pop_nonce");
       if (sent === undefined) throw new Error("a mutual_hello_ack fixture needs sent_pop_nonce");
-      hello = await verifyMutualHelloAck(envelope, { ...options, sentPopNonce: sent });
+      // `peer_aid` is the AID the initiator addressed (mh-015). A fixture
+      // without it does not test §5.2 step 3, so the sender stands in.
+      const sender = isJsonObject(envelope.sender) ? envelope.sender.agent_id : undefined;
+      const peerAid = str(p, "peer_aid") ?? (typeof sender === "string" ? sender : "");
+      hello = await verifyMutualHelloAck(envelope, { ...options, sentPopNonce: sent, peerAid });
     } else {
       hello = await verifyMutualHello(envelope, options);
     }
