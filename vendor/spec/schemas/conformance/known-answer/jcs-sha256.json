@@ -198,6 +198,7 @@
     },
     {
       "id": "kat-multihop-chain-001",
+      "draft": true,
       "rfc_refs": [
         "RFC-AITP-0011 §5"
       ],
@@ -215,6 +216,7 @@
     },
     {
       "id": "kat-multihop-truncation-001",
+      "draft": true,
       "rfc_refs": [
         "RFC-AITP-0011 §5"
       ],
@@ -226,6 +228,7 @@
     },
     {
       "id": "kat-session-bundle-001",
+      "draft": true,
       "signing_input": "body",
       "rfc_refs": [
         "RFC-AITP-0010 §3",

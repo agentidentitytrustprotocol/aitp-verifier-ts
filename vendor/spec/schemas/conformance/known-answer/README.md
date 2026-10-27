@@ -144,20 +144,34 @@ a re-mint reproduces them byte for byte.
 
 ## Stability
 
-These vectors are stable for AITP v0.3. New vectors MAY be added; an
-existing vector's output MUST NOT change without an RFC bump. If JCS
-or JWK Thumbprint specifications change in a way that breaks these
-vectors, AITP will issue a major version bump.
+These vectors are stable for AITP v0.3. The rule is: **additions only,
+except a security fix under [SECURITY.md](../../../SECURITY.md).**
 
-**Invoked once so far.** `kat-manifest-001`, `kat-revocation-001` and
-`kat-session-bundle-001` were regenerated when it was found that they
-pinned the transport wrapper rather than the signing input the RFCs
-specified. That correction carries a patch bump of the four RFCs whose
-citations moved (`0.2.0-draft` → `0.2.1-draft`), and `CHANGELOG.md`
-publishes the old and new bytes, digests and signatures so a consumer
-pinning them can tell which copy they hold. Note the direction: the
-requirement did not change, the artifacts were wrong — which is why it
-is a patch bump and not a protocol or schema-namespace break.
+- New vectors and signed examples MAY be added.
+- No existing vector's output, no signed example and no known-answer
+  keypair changes, except as part of a security fix handled under
+  [SECURITY.md](../../../SECURITY.md#security-fixes-that-change-the-wire).
+  Such a fix ships with a published advisory, and `CHANGELOG.md` lists
+  each old and new value so a consumer pinning them can tell which copy
+  they hold.
+- If the JCS or JWK Thumbprint specifications change in a way that
+  breaks these vectors, AITP issues a new protocol revision.
+
+The same rule is quoted in [`VERSIONING.md`](../../../VERSIONING.md)
+(Change classes and What is frozen).
+
+**Earlier rule, invoked once.** On the v0.2 line the rule allowed an
+existing output to change with an RFC bump. It was used once:
+`kat-manifest-001`, `kat-revocation-001` and `kat-session-bundle-001`
+were regenerated when it was found that they pinned the transport
+wrapper rather than the signing input the RFCs specified. That
+correction carried a patch bump of the four RFCs whose citations moved
+(`0.2.0-draft` → `0.2.1-draft`), and `CHANGELOG.md` publishes the old
+and new bytes, digests and signatures so a consumer pinning them can
+tell which copy they hold. Note the direction: the requirement did not
+change, the artifacts were wrong — which is why it was a patch bump and
+not a protocol or schema-namespace break. On the `aitp/0.3` line such a
+correction to a frozen vector is taken only as a security fix.
 
 **Re-minted for `aitp/0.3`.** The `aitp/0.3` revision changed the
 literal inside every signed artifact, so every vector and signed example
@@ -165,3 +179,27 @@ that carries it was re-minted by script with the same keys, `jti`s and
 timestamps. That is a protocol revision, not a use of the rule above.
 `CHANGELOG.md` lists each old and new output, and the `aitp/0.2` values
 stay in the frozen v0.2 line (commit `f9ee7ea`).
+
+### Draft vectors
+
+A vector or signed example pinned for a **Draft** RFC carries
+`"draft": true`. Today these are `kat-multihop-chain-001` and
+`kat-multihop-truncation-001` (RFC-AITP-0011), and
+`kat-session-bundle-001` with
+[`signed-examples/session-bundle/`](signed-examples/session-bundle/)
+(RFC-AITP-0010).
+
+- A draft entry is **outside the frozen set** until its RFC reaches
+  Release Candidate. Until then it may change with its RFC: the change
+  takes a `Version:` bump on that RFC, and `CHANGELOG.md` lists the old
+  and new values.
+- When the RFC reaches Release Candidate, the tag is removed in the same
+  change, and from then on the entry follows the rule above.
+- Everything else is in the frozen set. Any digest or manifest of the
+  frozen set covers untagged entries only.
+- An implementation reproduces draft entries exactly like the others.
+  The tag says how the entry may change, not whether it is checked.
+
+`make kat-verify` checks the tag in both directions: every listed draft
+entry carries exactly `true`, and no other entry carries a `draft`
+member. A frozen vector cannot leave the frozen set by being tagged.
