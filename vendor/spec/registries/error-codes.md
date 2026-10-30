@@ -4,7 +4,7 @@ AITP error codes returned in error envelopes (`AitpError.code`), with one except
 
 > **Stability:** The codes listed below are stable for v0.3. Implementations MUST treat unknown codes as opaque failures and MUST NOT key behavior off codes that are not in this registry. New codes can be added without an RFC; renaming or removing an existing code is a breaking change and requires the RFC process. (v0.2 renamed `DELEGATION_INVALID_GRANT_PROOF` → `DELEGATION_INVALID_VOUCHER` via that process, as part of the JWS migration — see the delegation table below.) "Without an RFC" waives the need for a new RFC *document*, not [VERSIONING.md](../VERSIONING.md)'s change classes: adding a code is a **backward-compatible addition** there. Note that the change *class* and the version *position* are separate questions: pre-1.0, VERSIONING.md reserves the minor position for the protocol revision, so a backward-compatible addition made inside an existing protocol revision takes a **patch-position** bump on the RFCs whose normative text gains the code, and records its minor class in the CHANGELOG. The two policies answer different questions — whether a new document is required (no) and how the version numbers move (patch position, minor class) — and compose rather than conflict.
 
-> **`spec_status` column.** Each code below carries a `spec_status` of either `core` or `draft`. `core` codes are part of v0.3 conformance and MAY be emitted by any conformant implementation. `draft` codes are reserved for the opt-in draft RFCs (currently RFC-AITP-0010 Session Trust Bundle and RFC-AITP-0011 Multi-hop Delegation) and MUST NOT be used except when implementing the cited draft RFC. Conformance runners MUST treat receipt of a `draft` code from an implementation that does not opt into the corresponding draft as a non-conformance.
+> **`spec_status` column.** Each code below carries a `spec_status` of either `core` or `draft`. `core` codes are part of v0.3 conformance and MAY be emitted by any conformant implementation. `draft` codes are reserved for the opt-in draft RFCs (currently RFC-AITP-0010 Session Trust Bundle, RFC-AITP-0011 Multi-hop Delegation and RFC-AITP-0013 TCT Renewal) and MUST NOT be used except when implementing the cited draft RFC. Conformance runners MUST treat receipt of a `draft` code from an implementation that does not opt into the corresponding draft as a non-conformance.
 
 ## Code naming convention
 
@@ -232,6 +232,33 @@ These codes are reserved for Session Trust Bundles (RFC-AITP-0010 is Draft and n
 | `BUNDLE_PARTICIPANT_TCT_INVALID` | At least one embedded participant TCT failed standard TCT verification. | draft |
 | `BUNDLE_NOT_MEMBER` | Receiver's AID is not in `participants[*].aid`. | draft |
 | `SESSION_BUNDLE_INVALID` | Aggregate fallback — implementations MAY return this when a deployment policy requires a single-error surface for bundles, in lieu of the specific codes above. | draft |
+
+## TCT renewal codes (RFC-AITP-0013, opt-in)
+
+TCT renewal (RFC-AITP-0013 is Draft and not part of core conformance) registers one code of its own, below. An issuer that does not offer renewal advertises no `renew_uri` and never emits it.
+
+| Code | Meaning | Retryable | spec_status |
+|---|---|---|---|
+| `RENEWAL_UNAVAILABLE` | The issuer could not complete renewal because an issuer-side dependency it must consult (its revocation state, its renewal nonce store) was unavailable. The issuer does not mint. It is not `TCT_REVOKED`: the current TCT is not known to be revoked. The issuer SHOULD send it with HTTP `503`; the holder MAY retry with backoff and a fresh `pop_nonce` before the current TCT's `exp` ([RFC-AITP-0013 §4 step 4, §5, §6](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#4-issuer-processing)). | true | draft |
+
+Every other renewal failure reuses a code defined in its own table above; the table below gives the meaning each takes in renewal, and lists `RENEWAL_UNAVAILABLE` at the steps that raise it. An issuer that does not offer renewal emits none of them for renewal.
+
+| Step | Code | Meaning in renewal |
+|---|---|---|
+| Issuer, [§4](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#4-issuer-processing) step 1 | `POP_RESPONSE_INVALID` | The renewal request is not an object with exactly `current_tct`, `pop_nonce` and `pop_signature`, or `pop_nonce` is not 16 bytes in 22 unpadded base64url characters. |
+| Issuer, §4 step 2 | `TCT_SIGNATURE_INVALID`, `TOKEN_TYP_MISMATCH`, `TOKEN_ALG_MISMATCH`, `UNKNOWN_FIELD` | `current_tct` fails RFC-AITP-0005 §7.2 as read by its issuer: not issued by this issuer, `aud` ≠ `sub`, or a grant-context defect. |
+| Issuer, §4 step 2 | `TCT_EXPIRED` | `current_tct` has expired. An expired TCT is never renewed. |
+| Issuer, §4 step 2 | `TCT_EXPIRES_AFTER_MANIFEST` | `current_tct.exp` exceeds the issuer's current Manifest `expires_at`. |
+| Issuer, §4 step 3 | `POP_RESPONSE_INVALID` | `pop_signature` does not verify under the `sub` key over the renewal PoP input (RFC-AITP-0013 §3.1). |
+| Issuer, §4 step 4 | `TCT_REVOKED` | `current_tct.jti` is in the issuer's deny list. Only then: an issuer that cannot read its own revocation state answers `RENEWAL_UNAVAILABLE`. |
+| Issuer, §4 step 4 | `RENEWAL_UNAVAILABLE` | The issuer cannot determine its own revocation state for `current_tct.jti`: its deny list, or the source that produces it, cannot be read. |
+| Issuer, §4 step 5 ([§5](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#5-nonce-store)) | `RENEWAL_UNAVAILABLE` | The renewal nonce store cannot be read or cannot record the nonce. |
+| Issuer, §4 step 5 | `REPLAY_DETECTED` | The issuer has already accepted a renewal request with this `pop_nonce`. |
+| Issuer, §4 step 6 | `POLICY_VIOLATION` | No grant survives re-evaluation against the issuer's current Manifest and policy, or policy refuses renewal to this holder. |
+| Holder, [§6.1](../rfcs/RFC-AITP-0013-tct-renewal-extension.md#61-holder-verification) step 2 | `PEER_MISMATCH` | The response envelope's `sender.agent_id` is not the current TCT's `iss`. |
+| Holder, §6.1 step 3 | `NONCE_MISMATCH` | `pop_nonce_echo` is not the `pop_nonce` the holder sent. |
+| Holder, §6.1 step 5 | `AUDIENCE_MISMATCH` | The renewed TCT's `sub` is not the holder, or its `cnf.jkt` differs from the current TCT's. |
+| Holder, §6.1 step 6 | `GRANT_OVERFLOW` | The renewed TCT carries a grant the current TCT does not. |
 
 ## Adding a code
 
